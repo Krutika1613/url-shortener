@@ -6,22 +6,27 @@ const prisma = new PrismaClient();
 export async function GET(_req, { params }) {
   const { code } = params;
 
-  const link = await prisma.link.findUnique({
-    where: { code },
-  });
+  try {
+    const link = await prisma.link.findUnique({
+      where: { shortCode: code },   // ✔ FIXED
+    });
 
-  if (!link) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!link) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    // Update click count
+    await prisma.link.update({
+      where: { shortCode: code },
+      data: {
+        clickCount: link.clickCount + 1,
+        lastClicked: new Date(),
+      },
+    });
+
+    return NextResponse.redirect(link.targetUrl);
+  } catch (err) {
+    console.error("GET /api/links/[code] error:", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
-
-  // Increment click count and update lastClicked
-  await prisma.link.update({
-    where: { code },
-    data: {
-      clickCount: link.clickCount + 1,
-      lastClicked: new Date(),
-    },
-  });
-
-  return NextResponse.redirect(link.targetUrl, 302);
 }
